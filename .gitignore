@@ -1,0 +1,48 @@
+# Byte-compiled files
+__pycache__/
+*.pyc
+*.pyd
+*.pyo
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE-specific files and directories
+.idea/  # PyCharm
+.vscode/ # VS Code (often useful to ignore workspace-specific settings)
+*.swp   # Vim swap files
+
+# Interpreter-specific files
+[Tt]ags
+
+# Packaging/Build files
+dist/
+build/
+*.egg
+*.whl
+
+# Test and coverage
+.coverage
+.tox/
+htmlcov/
+
+# Jupyter Notebook files
+.ipynb_checkpoints
+
+# Environment variables file
+.env
+
+# exp data
+PSA_data
+*.csv
+
+# config data
+config.txt
