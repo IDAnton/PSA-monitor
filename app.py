@@ -9,6 +9,7 @@ import pyqtgraph as pg
 import OpenGL
 import OpenGL.platform
 import copy
+import csv
 from PyQt5 import QtWidgets, QtCore, QtGui, QtOpenGL
 from PyQt5.QtGui import QFont
 from datetime import datetime
@@ -57,8 +58,6 @@ def export_livebuffers_to_csv(self, buffers: Dict[str, LiveBuffer], file_name:st
     if not path:
         return
     try:
-        import csv
-
         names = list(buffers.keys())
         if not names:
             return
@@ -69,7 +68,7 @@ def export_livebuffers_to_csv(self, buffers: Dict[str, LiveBuffer], file_name:st
             data[name] = (x, y)
             max_len = max(max_len, len(x))
         with open(path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
+            writer = csv.writer(f, delimiter=";")
             headers = []
             for name in names:
                 name = name.replace(" ","_")
@@ -82,8 +81,8 @@ def export_livebuffers_to_csv(self, buffers: Dict[str, LiveBuffer], file_name:st
                     x, y = data[name]
 
                     if i < len(x):
-                        row.append(f"{x[i]:.6f}")
-                        row.append(f"{y[i]:.6f}")
+                        row.append(f"{x[i]:.6f}".replace('.', ','))
+                        row.append(f"{y[i]:.6f}".replace('.', ','))
                     else:
                         row.append("")
                         row.append("")

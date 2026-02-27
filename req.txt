@@ -2,3 +2,5 @@ pyqtgraph
 PyQt5
 numpy
 paramiko
+PyOpenGL
+PyOpenGL_accelerate
