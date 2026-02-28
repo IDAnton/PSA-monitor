@@ -242,7 +242,7 @@ def init_adsorbers() -> List[Adsorber]:
 
 adsorption = AdsorptionStage("adsorption", True, False, False, False, True, None)
 purge = AdsorptionStage("purge", False, True, False, True, False, None)
-ppe = AdsorptionStage("ppe", False, False, False, True, False, None)
+ppe = AdsorptionStage("ppe", True, False, False, True, False, None)
 dpe = AdsorptionStage("dpe", False, False, False, True, False, None)
 blowdown = AdsorptionStage("blowdown", False, True, False, False, False, None)
 pressurization = AdsorptionStage("pressurization", True, False, False, False, False, None)
