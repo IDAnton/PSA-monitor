@@ -146,22 +146,32 @@ class TimeAxis(pg.AxisItem):
 
 # График с возможностью превью
 class PressurePlotWidget(QtWidgets.QWidget):
-    def __init__(self, line_names, colors, buffer_size=50000, parent=None, plots=None):
+    def __init__(self, line_names, colors, buffer_size=50000, parent=None, plots=None, x_y_label_offset=20):
         super().__init__(parent)
 
         self.line_names = line_names
         self.colors = colors
         self.auto_scroll = True
         self.active = False
+        self.x_y_label_offset = x_y_label_offset
 
         # ОСНОВНОЙ ГРАФИК
         axis = TimeAxis(orientation='bottom')
         self.plot = pg.PlotWidget(axisItems={'bottom': axis})
+        self.plot.setMouseTracking(True)
         self.plot.setBackground('w')
         self.plot.showGrid(x=True, y=True)
 
-        self.legend = pg.LegendItem((100, 60), offset=(50, 10), labelTextSize='12pt', labelTextColor='#1d1f1e')
+        self.proxy = pg.SignalProxy(self.plot.scene().sigMouseMoved, rateLimit=60, slot=self.mouse_moved) # колбэк для подписи x,y курсора
+        self.coord_label = pg.LabelItem(justify='right', color = "#1d1f1eef")
+        self.coord_label.setZValue(100)
+        self.plot.scene().addItem(self.coord_label)
+        self.coord_label.setPos(self.x_y_label_offset, self.coord_label.height() - 20) 
+
+        self.legend = pg.LegendItem((100, 60), offset=(50, 10), labelTextSize='12pt', labelTextColor="#131414")
         self.legend.setParentItem(self.plot.getPlotItem())
+
+
 
         # ЛИНИИ + БУФЕРЫ
         self.buffers = {}
@@ -201,12 +211,8 @@ class PressurePlotWidget(QtWidgets.QWidget):
         # СИНХРОНИЗАЦИЯ
         self._syncing = False
 
-        self.region.sigRegionChanged.connect(
-            self._update_main_from_region
-        )
-        self.plot.sigXRangeChanged.connect(
-            self._update_region_from_main
-        )
+        self.region.sigRegionChanged.connect(self._update_main_from_region)
+        self.plot.sigXRangeChanged.connect(self._update_region_from_main)
 
         # LAYOUT
         layout = QtWidgets.QVBoxLayout(self)
@@ -261,6 +267,21 @@ class PressurePlotWidget(QtWidgets.QWidget):
             self.region.setRegion(x_range)
         finally:
             self._syncing = False
+
+    def mouse_moved(self, evt):
+        pos = evt[0]
+        vb = self.plot.plotItem.vb
+        if self.plot.sceneBoundingRect().contains(pos):
+            mouse_point = vb.mapSceneToView(pos)
+            time = datetime.fromtimestamp(mouse_point.x()).strftime('%H:%M:%S')
+            self.coord_label.setText(f"x={time}\ny={mouse_point.y():.2f}")
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.coord_label.setPos(self.x_y_label_offset, self.plot.height() - self.coord_label.height() - 20)
+        
+                
+
 
 
 # легенда для линий стадий, с цветами из brush_colors.py
@@ -867,7 +888,8 @@ class FlowMassTab(QtWidgets.QWidget):
         self.flows_plot_widget = PressurePlotWidget(line_names=['FL 1 [В]', 'FL 2 [В]', 'FL 3 [В]', 'FL 4 [В]', 'FL equalization [В]', 'FL digital [В]',
                                                                 'FL 1 [л/мин]', 'FL 2 [л/мин]', 'FL 3 [л/мин]', 'FL 4 [л/мин]', 'FL equalization [л/мин]', 'FL digital [л/мин]'], 
                                                                 colors=['r', '#0bb825', 'b', 'orange', 'purple', 'k',
-                                                                        'r', '#0bb825', 'b', 'orange', 'purple', 'k'])
+                                                                        'r', '#0bb825', 'b', 'orange', 'purple', 'k'],
+                                                                        x_y_label_offset=35)
         tab_flows_layout.addWidget(self.flows_plot_widget)
 
         self.use_calibration_checkbox = QtWidgets.QCheckBox("Применять калибровку")
