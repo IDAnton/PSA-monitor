@@ -165,6 +165,7 @@ class FlowMass:
     def __init__(self, name: str, calibration: Calibration = None):
         self.name = name
         self.calibration = calibration
+        self.calibration_mixture_factor = 1 # коэф пересчета расхода для смеси
         self.control_history_volts = [] # {timestamp, value}
         self.set_history_volts = [] # {timestamp, value}
         self.control_history_l_STP = [] # {timestamp, l_STP}
@@ -189,9 +190,9 @@ class FlowMass:
 
     def volts_to_L_STP(self, value_volts):
         if value_volts <= self.a:
-            return self.k1 * value_volts + self.b1
+            return (self.k1 * value_volts + self.b1) * self.calibration_mixture_factor
         else:
-            return self.k2 * value_volts + self.b2
+            return (self.k2 * value_volts + self.b2) * self.calibration_mixture_factor
 
     
     def set_control_data(self, timestamp: float, value_volts: float):

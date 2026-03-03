@@ -102,6 +102,8 @@ class CycleAnalyzer: # 2 bed PSA analyzer
                     self.current_cycle_number += 1
                     self.cycle_time_line.append({"time": stage_start_time, "number": self.current_cycle_number})
                     self.calculate_extraction()
+                    if self.cycle_number_at_wich_track_total_Q_fl_minus_Q_leak_on_product_gas == (self.current_cycle_number - 1): # меняем калибровку входного FL если идет смесь
+                        self.fl_crude.calibration_mixture_factor = self.calibration_mixture_factor
                     return True
         return False
 
@@ -119,11 +121,8 @@ class CycleAnalyzer: # 2 bed PSA analyzer
         cycle_start_time = self.cycle_time_line[-2]["time"]
         cycle_end_time = self.stages_time_line[-1]["time"]
         
-        Q_input_1 = self.fl_crude.calculate_consumption_over_period_l_STP(cycle_start_time, (cycle_end_time - cycle_start_time)/2 + cycle_start_time)
+        Q_input_1 = self.fl_crude.calculate_consumption_over_period_l_STP(cycle_start_time, (cycle_end_time - cycle_start_time)/2 + cycle_start_time) # уже с учетом self.calibration_mixture_factor - перехода на смесь
         Q_input_2 = self.fl_crude.calculate_consumption_over_period_l_STP((cycle_end_time - cycle_start_time)/2 + cycle_start_time, cycle_end_time)
-        if self.cycle_number_at_wich_track_total_Q_fl_minus_Q_leak_on_product_gas <= (self.current_cycle_number - 1): # если идет смесь то пересчитываем в смесь
-            Q_input_1 *= self.calibration_mixture_factor
-            Q_input_2 *= self.calibration_mixture_factor
         total_input_gas = Q_input_1 + Q_input_2
 
         Q_prod_ads_1 = self.fl_digital.calculate_consumption_over_period_l_STP(cycle_start_time, (cycle_end_time - cycle_start_time)/2 + cycle_start_time)
