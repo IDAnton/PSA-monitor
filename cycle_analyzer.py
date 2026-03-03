@@ -136,9 +136,17 @@ class CycleAnalyzer: # 2 bed PSA analyzer
         if self.total_Q_fl_minus_Q_leak_on_product_gas is not None:
             cycle_on_mix = True
 
-            self.total_Q_fl_minus_Q_leak_on_product_gas = -2.839361443
-            extraction_ratio = (total_product_gas + self.V_top*self.adsorber1.dpe_p*(T_STP/self.T) + self.V_top*self.adsorber2.dpe_p*(T_STP/self.T)) / \
-                ((total_input_gas  + self.total_Q_fl_minus_Q_leak_on_product_gas - self.V_bot*self.adsorber1.dpe_p*(T_STP/self.T) - self.V_bot*self.adsorber2.dpe_p*(T_STP/self.T)) * self.product_in_crude_ratio)
+            leak_p2 = 0.05
+            leak_p5 = 0.05
+            total_Q_fl_minus_Q_leak = leak_p2+ leak_p5
+
+            self.total_Q_fl_minus_Q_leak_on_product_gas = leak_p2+ leak_p5
+
+            # extraction_ratio = (total_product_gas + self.V_top*self.adsorber1.dpe_p*(T_STP/self.T) + self.V_top*self.adsorber2.dpe_p*(T_STP/self.T)) / \
+            #     ((total_input_gas  + self.total_Q_fl_minus_Q_leak_on_product_gas - self.V_bot*self.adsorber1.dpe_p*(T_STP/self.T) - self.V_bot*self.adsorber2.dpe_p*(T_STP/self.T)) * self.product_in_crude_ratio)
+
+            extraction_ratio = (total_product_gas + leak_p5 + self.V_top*self.adsorber1.dpe_p*(T_STP/self.T) + self.V_top*self.adsorber2.dpe_p*(T_STP/self.T)) / \
+                ((total_input_gas  - leak_p2 - self.V_bot*self.adsorber1.dpe_p*(T_STP/self.T) - self.V_bot*self.adsorber2.dpe_p*(T_STP/self.T)) * self.product_in_crude_ratio)
             
             extraction_ratio_naive = total_product_gas / (total_input_gas * self.product_in_crude_ratio)
 
@@ -153,7 +161,7 @@ class CycleAnalyzer: # 2 bed PSA analyzer
 
             Q_fl_minus_Q_leak_1 = self.V_adsorber_total*(P_dpe_1) * (T_STP / self.T) + Q_prod_ads_1/(1-self.p_f_ratio) - Q_input_1 * self.product_in_crude_ratio
             Q_fl_minus_Q_leak_2 = self.V_adsorber_total*(P_dpe_2) * (T_STP / self.T) + Q_prod_ads_2/(1-self.p_f_ratio) - Q_input_2 * self.product_in_crude_ratio
-            total_Q_fl_minus_Q_leak = -2.839361443 #Q_fl_minus_Q_leak_1 + Q_fl_minus_Q_leak_2
+            #total_Q_fl_minus_Q_leak = -4.29 #Q_fl_minus_Q_leak_1 + Q_fl_minus_Q_leak_2    #-2.839361443 #Q_fl_minus_Q_leak_1 + Q_fl_minus_Q_leak_2
 
         # Цикл на продукте
         else:  
@@ -161,12 +169,17 @@ class CycleAnalyzer: # 2 bed PSA analyzer
 
             Q_fl_minus_Q_leak_1 = self.V_adsorber_total*(P_dpe_1) * (T_STP / self.T) + Q_prod_ads_1/(1-self.p_f_ratio) - Q_input_1
             Q_fl_minus_Q_leak_2 = self.V_adsorber_total*(P_dpe_2) * (T_STP / self.T) + Q_prod_ads_2/(1-self.p_f_ratio) - Q_input_2
-            total_Q_fl_minus_Q_leak = Q_fl_minus_Q_leak_1 + Q_fl_minus_Q_leak_2
+            #total_Q_fl_minus_Q_leak = Q_fl_minus_Q_leak_1 + Q_fl_minus_Q_leak_2
+            leak_p2 = 0.05
+            leak_p5 = 0.05
+            total_Q_fl_minus_Q_leak = leak_p2+ leak_p5
 
 
+            # extraction_ratio = (total_product_gas + self.V_top*self.adsorber1.dpe_p*(T_STP/self.T) + self.V_top*self.adsorber2.dpe_p*(T_STP/self.T)) / \    
+            #     ((total_input_gas  + total_Q_fl_minus_Q_leak - self.V_bot*self.adsorber1.dpe_p*(T_STP/self.T) - self.V_bot*self.adsorber2.dpe_p*(T_STP/self.T)))
 
-            extraction_ratio = (total_product_gas + self.V_top*self.adsorber1.dpe_p*(T_STP/self.T) + self.V_top*self.adsorber2.dpe_p*(T_STP/self.T)) / \
-                ((total_input_gas  + total_Q_fl_minus_Q_leak - self.V_bot*self.adsorber1.dpe_p*(T_STP/self.T) - self.V_bot*self.adsorber2.dpe_p*(T_STP/self.T)))
+            extraction_ratio = (total_product_gas + leak_p5 + self.V_top*self.adsorber1.dpe_p*(T_STP/self.T) + self.V_top*self.adsorber2.dpe_p*(T_STP/self.T)) / \
+                ((total_input_gas  - leak_p2 - self.V_bot*self.adsorber1.dpe_p*(T_STP/self.T) - self.V_bot*self.adsorber2.dpe_p*(T_STP/self.T)))
             
             extraction_ratio_naive = total_product_gas / total_input_gas
             extraction_ratio_with_collectors = (total_product_gas + self.V_top*(self.adsorber1.dpe_p)*(T_STP/self.T) + self.V_top*(self.adsorber2.dpe_p)*(T_STP/self.T)) / \
@@ -182,7 +195,7 @@ class CycleAnalyzer: # 2 bed PSA analyzer
         if self.cycle_number_at_wich_track_total_Q_fl_minus_Q_leak_on_product_gas == (self.current_cycle_number):
             self.total_Q_fl_minus_Q_leak_on_product_gas = total_Q_fl_minus_Q_leak
 
-        self.cycle_time_line[-2]["Q_leak_minus_Q_fl"] = - total_Q_fl_minus_Q_leak       # утечка
+        self.cycle_time_line[-2]["Q_leak_minus_Q_fl"] = + total_Q_fl_minus_Q_leak       # утечка
         self.cycle_time_line[-2]["extraction_ratio"] = extraction_ratio                 # Извлечение полное
         self.cycle_time_line[-2]["extraction_ratio_naive"] = extraction_ratio_naive     # Степень извлечения
         self.cycle_time_line[-2]["extraction_ratio_with_collectors"] = extraction_ratio_with_collectors # Степень извлечения с учетом коллекторов
