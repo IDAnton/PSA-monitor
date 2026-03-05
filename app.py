@@ -53,8 +53,15 @@ class LiveBuffer:
     def get_x_y_numpy(self):
         return np.array(self.x), np.array(self.y)
     
-def export_livebuffers_to_csv(self, buffers: Dict[str, LiveBuffer], file_name:str):
-    path, _ = QtWidgets.QFileDialog.getSaveFileName(self,"Сохранить данные",file_name,"CSV files (*.csv)")
+
+def export_to_csv(self, buffers: Dict[str, LiveBuffer], fl_buffers: Dict[str, LiveBuffer], file_path: str, cycle_duration_list):
+    export_livebuffers_to_csv(self=self,buffers=self.buffers, file_name=f"{file_path}_cyclogram.csv",
+                                                                          cycle_duration_list=self.cycle_duration_list)
+    export_livebuffers_to_csv(self=self,buffers=fl_buffers, file_name=f"{file_path}_flow_control.csv",
+                                                                          cycle_duration_list=self.cycle_duration_list)
+    
+def export_livebuffers_to_csv(self, buffers: Dict[str, LiveBuffer], file_name:str, cycle_duration_list: List[float]):
+    path, _ = QtWidgets.QFileDialog.getSaveFileName(self,"Сохранить данные", file_name, "CSV files (*.csv)")
     if not path:
         return
     try:
@@ -64,31 +71,47 @@ def export_livebuffers_to_csv(self, buffers: Dict[str, LiveBuffer], file_name:st
         data = {}
         max_len = 0
         for name in names:
-            x, y = buffers[name].get()
-            data[name] = (x, y)
-            max_len = max(max_len, len(x))
+            timestamp, p = buffers[name].get()
+            data[name] = (timestamp, p)
+            max_len = max(max_len, len(timestamp))
         with open(path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter=";")
             headers = []
             for name in names:
                 name = name.replace(" ","_")
                 headers.append(f"timestamp_{name}")
+                headers.append(f"sec_from_start_{name}")
+                headers.append(f"Cycle_{name}")
                 headers.append(f"P_{name}")
+
             writer.writerow(headers)
+
+            t_start_cycle = 0
+            current_c = 0
             for i in range(max_len):
                 row = []
                 for name in names:
                     x, y = data[name]
-
                     if i < len(x):
-                        row.append(f"{x[i]:.6f}".replace('.', ','))
-                        row.append(f"{y[i]:.6f}".replace('.', ','))
+                        row.append(f"{x[i]:.6f}".replace('.', ',')) # timestamp
+                        time_from_start = (x[i] - x[0])
+                        row.append(f"{time_from_start:.6f}".replace('.', ',')) # time from start
+                        if (time_from_start - t_start_cycle) < cycle_duration_list[current_c]:
+                            time_in_cycle = current_c + (time_from_start - t_start_cycle)/cycle_duration_list[current_c]
+                        elif current_c < len(cycle_duration_list)-1:
+                            t_start_cycle = time_from_start
+                            current_c += 1
+                            time_in_cycle = current_c+(time_from_start - t_start_cycle)/cycle_duration_list[current_c]
+                        row.append(f"{time_in_cycle:.6f}".replace('.', ',')) # time in cycle
+                        row.append(f"{y[i]:.6f}".replace('.', ',')) # P
                     else:
+                        row.append("")
+                        row.append("")
                         row.append("")
                         row.append("")
 
                 writer.writerow(row)
-        QtWidgets.QMessageBox.information(self, "Успешно", "CSV файл сохранён.")
+        QtWidgets.QMessageBox.information(self, "Успешно", f"{file_name} файл сохранён.")
     except Exception as e:
         QtWidgets.QMessageBox.critical(self, "Ошибка", str(e))
     
@@ -378,7 +401,7 @@ class StageCycleMiniTable(QtWidgets.QWidget):
 
 # Графики друг под другом
 class StackedPlotsTab(QtWidgets.QWidget):
-    def __init__(self, line_names: List[str], colors: List[str], file_path: str):
+    def __init__(self, line_names: List[str], colors: List[str], file_path: str, flow_control_data):
         super().__init__()
         self.line_names = line_names
         self.file_path = file_path
@@ -389,6 +412,9 @@ class StackedPlotsTab(QtWidgets.QWidget):
 
         self.active = False
         self.auto_scroll = True
+
+        self.cycle_duration_list = [] # для экспорта в csv
+        self.flow_control_data = flow_control_data   # для экспорта в csv
 
         # --- основной layout
         main_layout = QtWidgets.QHBoxLayout(self)
@@ -473,7 +499,8 @@ class StackedPlotsTab(QtWidgets.QWidget):
 
         # кнопка экпорта
         self.export_btn = QtWidgets.QPushButton("Экспортировать")
-        self.export_btn.clicked.connect(lambda: export_livebuffers_to_csv(self=self, buffers=self.buffers, file_name=f"{self.file_path}_циклограмма.csv"))
+        self.export_btn.clicked.connect(lambda: export_to_csv(self=self, buffers=self.buffers, fl_buffers=self.flow_control_data, file_path=self.file_path,
+                                                                          cycle_duration_list=self.cycle_duration_list))
         right_panel.addWidget(self.export_btn)
         
         # добавляем правую панель в главный layout
@@ -970,7 +997,7 @@ class MainWindow(QtWidgets.QWidget):
         tab_cycle = QtWidgets.QTabWidget()
         tab_cycle_layout = QtWidgets.QVBoxLayout(tab_cycle)
         # --- График
-        self.cycle_widget = StackedPlotsTab(line_names=['Adsorber 1', 'Adsorber 2', 'Adsorber 3', 'Adsorber 4'], colors=['r', '#0bb825', 'b', 'orange'], file_path=self.file_path)
+        self.cycle_widget = StackedPlotsTab(line_names=['Adsorber 1', 'Adsorber 2', 'Adsorber 3', 'Adsorber 4'], colors=['r', '#0bb825', 'b', 'orange'], file_path=self.file_path, flow_control_data=self.flows_plot_widget.buffers)
         self.plot_widgetes.append(self.cycle_widget)
         tab_cycle_layout.addWidget(self.cycle_widget)
 
@@ -1054,6 +1081,7 @@ class MainWindow(QtWidgets.QWidget):
     def add_cycle_monitor_data_to_stages_tab(self, data: dict):
         self.cycle_widget.stage_cycle_table.add_cycle(cycle_number=data["number"], recovery_degree=data["extraction_ratio"], cycle_on_mix=data["cycle_on_mix"])
         self.cycle_widget.add_cycle_number_text(t_start=data["time"], number=data["number"])
+        self.cycle_widget.cycle_duration_list.append(data["duration_sec"])
         
 
     # STREAM ERROR HANDLER
