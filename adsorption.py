@@ -240,12 +240,16 @@ def init_adsorbers() -> List[Adsorber]:
         adsorbers.append(adsorber)
     return adsorbers
 
-
-adsorption = AdsorptionStage("adsorption", True, False, False, False, True, None)
-purge = AdsorptionStage("purge", False, True, False, True, False, None)
-ppe = AdsorptionStage("ppe", True, False, False, True, False, None)
-dpe = AdsorptionStage("dpe", False, False, False, True, False, None)
-blowdown = AdsorptionStage("blowdown", False, True, False, False, False, None)
-pressurization = AdsorptionStage("pressurization", True, False, False, False, False, None)
-
-two_bed_psa_stages = [adsorption, purge, ppe, blowdown, pressurization, dpe] 
+def init_stages(dpe_line) -> List[AdsorptionStage]:
+    if dpe_line.strip() == "p3":
+        ppe = AdsorptionStage("ppe", True, False, True, False, False, None)
+        dpe = AdsorptionStage("dpe", False, False, True, False, False, None)
+    if dpe_line.strip() == "p4":
+        ppe = AdsorptionStage("ppe", True, False, False, True, False, None)
+        dpe = AdsorptionStage("dpe", False, False, False, True, False, None)
+    adsorption = AdsorptionStage("adsorption", True, False, False, False, True, None)
+    purge = AdsorptionStage("purge", False, True, False, True, False, None)
+    blowdown = AdsorptionStage("blowdown", False, True, False, False, False, None)
+    pressurization = AdsorptionStage("pressurization", True, False, False, False, False, None)
+    two_bed_psa_stages = [adsorption, purge, ppe, blowdown, pressurization, dpe] 
+    return two_bed_psa_stages
