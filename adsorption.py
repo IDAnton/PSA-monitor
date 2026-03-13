@@ -35,7 +35,7 @@ class Valve:
         self.is_open = state
 
 class Adsorber:
-    def __init__(self, p1_val: Valve, p2_val: Valve, p3_val: Valve, p4_val: Valve, p5_val: Valve):
+    def __init__(self, p1_val: Valve, p2_val: Valve, p3_val: Valve, p4_val: Valve, p5_val: Valve, dpe_ppe_line: str):
         self.p1 = p1_val
         self.p2 = p2_val
         self.p3 = p3_val
@@ -47,14 +47,28 @@ class Adsorber:
         self.stage_history_without_idle = [] # [timestamp, stage_name]
 
         # для расчеат извлечения
-        self.ppe_p = None
-        self.dpe_p = None
+        self.ppe_p = 0
+        self.dpe_p = 0
+
+        self.dpe_ppe_line = dpe_ppe_line
 
     def get_last_pressure(self):
         if self.pressure_history:
             return self.pressure_history[-1][1]
         else:
             return 0
+        
+    def set_ppe_p(self, p3, p4):
+        if self.dpe_ppe_line.strip() == "p3":
+            self.ppe_p = p3
+        else:
+            self.ppe_p = p4
+    
+    def set_dpe_p(self, p3, p4):
+        if self.dpe_ppe_line.strip() == "p3":
+            self.dpe_p = p3
+        else:
+            self.dpe_p = p4
         
         
     def get_last_stage(self, timestamp: float = None):
@@ -228,7 +242,7 @@ class FlowMass:
         return consumption
 
 
-def init_adsorbers() -> List[Adsorber]:
+def init_adsorbers(dpe_ppe_line) -> List[Adsorber]:
     adsorbers = []
     for i in range(4):
         p1 = Valve(f"K{i*5+8}")
@@ -236,7 +250,7 @@ def init_adsorbers() -> List[Adsorber]:
         p3 = Valve(f"K{i*5+10}")
         p4 = Valve(f"K{i*5+11}")
         p5 = Valve(f"K{i*5+12}")
-        adsorber = Adsorber(p1, p2, p3, p4, p5)
+        adsorber = Adsorber(p1, p2, p3, p4, p5, dpe_ppe_line = dpe_ppe_line)
         adsorbers.append(adsorber)
     return adsorbers
 

@@ -8,7 +8,11 @@ time1 = []
 time2 = []
 p1 = []
 p2 = []
-c_len = [467,460,462,461,462,466,463,463,465,464,463,466,461,461,461,463,465,461,461,462,463,461,462,461,463,464,466,464,466,468,466,453,364,338,342]
+c_len = []
+with open(f"Cycle_len.txt", "r") as f:
+    for line in f.readlines():
+        c_len.append(int(line))
+
 c_len = c_len[::-1]
 # with open(f'КЦА_20_циклограмма.csv', mode='r', newline='') as file:
 #     csv_reader = csv.reader(file, delimiter=";")
@@ -22,9 +26,9 @@ c_len = c_len[::-1]
 #             p2.append(row[3])
 
 time1 = []
-with open(f"time_PLK.txt", "r") as f:
+with open(f"time_RGA.txt", "r") as f:
     for line in f.readlines():
-        time1.append(float(line))
+        time1.append(float(line.replace(",", ".")))
 
 
 t0 = time1[0]
