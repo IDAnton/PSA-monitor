@@ -14,16 +14,7 @@ with open(f"Cycle_len.txt", "r") as f:
         c_len.append(int(line))
 
 c_len = c_len[::-1]
-# with open(f'КЦА_20_циклограмма.csv', mode='r', newline='') as file:
-#     csv_reader = csv.reader(file, delimiter=";")
-#     next(csv_reader, None) 
-#     for row in csv_reader:
-#         if row[1] != "":
-#             time1.append(float(row[0].replace(",", ".")))
-#             p1.append(row[1])
-#         if row[2] != "":
-#             time2.append(float(row[2].replace(",", ".")))
-#             p2.append(row[3])
+
 
 time1 = []
 with open(f"time_RGA.txt", "r") as f:
@@ -49,10 +40,10 @@ for i in range(len(time1)):
 
 
 with open('циклограмма.csv', "w", newline="", encoding="utf-8") as f:
-    writer = csv.writer(f, delimiter=";")
+    writer = csv.writer(f, delimiter=" ")
     for i in range(len(res1)):
         row = []
         if i < len(res1):
-            row.append(f"{time1[i]}".replace('.', ','))
-            row.append(f"{res1[i]}".replace('.', ','))
+            row.append(f"{time1[i]+t0}")# .replace('.', ','))
+            row.append(f"{res1[i]}" )#.replace('.', ','))
         writer.writerow(row)
