@@ -9,16 +9,17 @@ time2 = []
 p1 = []
 p2 = []
 c_len = []
-with open(f"cycle.txt", "r") as f:
+with open(f"Cycle_len.txt", "r") as f:
     for line in f.readlines():
-        c_len.append(float(line))
+        c_len.append(int(line))
+
 c_len = c_len[::-1]
 
 
 time1 = []
-with open(f"timeline.txt", "r") as f:
+with open(f"time_RGA.txt", "r") as f:
     for line in f.readlines():
-        time1.append(float(line))
+        time1.append(float(line.replace(",", ".")))
 
 
 t0 = time1[0]

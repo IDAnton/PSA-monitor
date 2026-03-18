@@ -111,15 +111,15 @@ class CycleAnalyzer: # 2 bed PSA analyzer
         for i in range(len(self.stages_time_line)-1, -1, -1):
             if self.stages_time_line[i]["stage1"] == stage_name1 and self.stages_time_line[i]["stage2"] == stage_name2:
                 return self.stages_time_line[i]["time"]
-        return None
+        return 0
+
 
 
     def calculate_extraction(self):
-        P_dpe_1 = self.adsorber1.dpe_p
-        P_dpe_2 = self.adsorber2.dpe_p
-
         cycle_start_time = self.cycle_time_line[-2]["time"]
-        cycle_end_time = self.stages_time_line[-1]["time"]
+        cycle_end_time = self.cycle_time_line[-1]["time"]
+        t_cycle = self.cycle_time_line[-1]["time"] - self.cycle_time_line[-2]["time"]
+        t_ads = self.get_last_stage_start_time_by_name("dpe", "ppe") - self.get_last_stage_start_time_by_name("purge", "adsorption")
         
         Q_input_1 = self.fl_crude.calculate_consumption_over_period_l_STP(cycle_start_time, (cycle_end_time - cycle_start_time)/2 + cycle_start_time) # уже с учетом self.calibration_mixture_factor - перехода на смесь
         Q_input_2 = self.fl_crude.calculate_consumption_over_period_l_STP((cycle_end_time - cycle_start_time)/2 + cycle_start_time, cycle_end_time)
@@ -129,83 +129,59 @@ class CycleAnalyzer: # 2 bed PSA analyzer
         Q_prod_ads_2 = self.fl_digital.calculate_consumption_over_period_l_STP((cycle_end_time - cycle_start_time)/2 + cycle_start_time, cycle_end_time)
         total_product_gas = Q_prod_ads_1 + Q_prod_ads_2
 
-        total_dump_throw_dpe = self.V_dead*(P_dpe_1) * (T_STP / self.T) + self.V_dead*(P_dpe_2) * (T_STP / self.T)
-        total_dump_on_purge = Q_prod_ads_1*self.p_f_ratio/(1-self.p_f_ratio) + Q_prod_ads_2*self.p_f_ratio/(1-self.p_f_ratio)
+        # total_dump_throw_dpe = self.V_dead*(P_dpe_1) * (T_STP / self.T) + self.V_dead*(P_dpe_2) * (T_STP / self.T)
+        # total_dump_on_purge = Q_prod_ads_1*self.p_f_ratio/(1-self.p_f_ratio) + Q_prod_ads_2*self.p_f_ratio/(1-self.p_f_ratio)
 
         # Цикл на смеси
         if self.total_Q_fl_minus_Q_leak_on_product_gas is not None:
             cycle_on_mix = True
 
-            leak_p2 = 0.05
-            leak_p5 = 0.05
-            total_Q_fl_minus_Q_leak = leak_p2+ leak_p5
+            product_on_top = self.V_top*self.adsorber1.dpe_p*(T_STP/self.T) + self.V_top*self.adsorber2.dpe_p*(T_STP/self.T)
+            product_on_bot = (self.V_bot*self.adsorber1.dpe_p*(T_STP/self.T) + self.V_bot*self.adsorber2.dpe_p*(T_STP/self.T)) * self.product_in_crude_ratio
 
-            self.total_Q_fl_minus_Q_leak_on_product_gas = leak_p2+ leak_p5
 
-            # extraction_ratio = (total_product_gas + self.V_top*self.adsorber1.dpe_p*(T_STP/self.T) + self.V_top*self.adsorber2.dpe_p*(T_STP/self.T)) / \
-            #     ((total_input_gas  + self.total_Q_fl_minus_Q_leak_on_product_gas - self.V_bot*self.adsorber1.dpe_p*(T_STP/self.T) - self.V_bot*self.adsorber2.dpe_p*(T_STP/self.T)) * self.product_in_crude_ratio)
-
-            extraction_ratio = (total_product_gas + leak_p5 + self.V_top*self.adsorber1.dpe_p*(T_STP/self.T) + self.V_top*self.adsorber2.dpe_p*(T_STP/self.T)) / \
-                ((total_input_gas  - leak_p2 - self.V_bot*self.adsorber1.dpe_p*(T_STP/self.T) - self.V_bot*self.adsorber2.dpe_p*(T_STP/self.T)) * self.product_in_crude_ratio)
+            p_f_ratio_exp = 1 - (t_cycle*total_product_gas)/(2*t_ads*total_input_gas*self.product_in_crude_ratio)
+            p_f_ratio_with_b = 1 - t_cycle*(total_product_gas)/((2*t_ads)*(total_input_gas*self.product_in_crude_ratio - product_on_bot))
+            p_f_ratio_with_t_b = 1 - t_cycle*(total_product_gas + product_on_top)/((2*t_ads)*(total_input_gas*self.product_in_crude_ratio - product_on_bot))
             
             extraction_ratio_naive = total_product_gas / (total_input_gas * self.product_in_crude_ratio)
 
-            extraction_ratio_with_collectors = (total_product_gas + self.V_top*self.adsorber1.dpe_p*(T_STP/self.T) + self.V_top*self.adsorber2.dpe_p*(T_STP/self.T)) / \
-                ((total_input_gas - self.V_bot*self.adsorber1.dpe_p*(T_STP/self.T) - self.V_bot*self.adsorber2.dpe_p*(T_STP/self.T)) * self.product_in_crude_ratio )
-            
-            gass_loss_on_collectors = (self.V_top*(self.adsorber1.dpe_p)*(T_STP/self.T) + self.V_top*(self.adsorber2.dpe_p)*(T_STP/self.T)) + \
-             + (self.V_bot*(self.adsorber1.dpe_p)*(T_STP/self.T) + self.V_bot*(self.adsorber2.dpe_p)*(T_STP/self.T)) * self.product_in_crude_ratio
+            extraction_ratio_with_collectors = (total_product_gas + product_on_top) / ((total_input_gas*self.product_in_crude_ratio - product_on_bot))
+            extraction_ratio_max = (2*t_ads*total_input_gas*self.product_in_crude_ratio ) / (t_cycle *total_input_gas*self.product_in_crude_ratio )
             
             total_input_product = total_input_gas * self.product_in_crude_ratio
-
-
-            Q_fl_minus_Q_leak_1 = self.V_adsorber_total*(P_dpe_1) * (T_STP / self.T) + Q_prod_ads_1/(1-self.p_f_ratio) - Q_input_1 * self.product_in_crude_ratio
-            Q_fl_minus_Q_leak_2 = self.V_adsorber_total*(P_dpe_2) * (T_STP / self.T) + Q_prod_ads_2/(1-self.p_f_ratio) - Q_input_2 * self.product_in_crude_ratio
-            #total_Q_fl_minus_Q_leak = -4.29 #Q_fl_minus_Q_leak_1 + Q_fl_minus_Q_leak_2    #-2.839361443 #Q_fl_minus_Q_leak_1 + Q_fl_minus_Q_leak_2
 
         # Цикл на продукте
         else:  
             cycle_on_mix = False
+            product_on_top = self.V_top*self.adsorber1.dpe_p*(T_STP/self.T) + self.V_top*self.adsorber2.dpe_p*(T_STP/self.T)
+            product_on_bot = self.V_bot*self.adsorber1.dpe_p*(T_STP/self.T) + self.V_bot*self.adsorber2.dpe_p*(T_STP/self.T)
 
-            Q_fl_minus_Q_leak_1 = self.V_adsorber_total*(P_dpe_1) * (T_STP / self.T) + Q_prod_ads_1/(1-self.p_f_ratio) - Q_input_1
-            Q_fl_minus_Q_leak_2 = self.V_adsorber_total*(P_dpe_2) * (T_STP / self.T) + Q_prod_ads_2/(1-self.p_f_ratio) - Q_input_2
-            #total_Q_fl_minus_Q_leak = Q_fl_minus_Q_leak_1 + Q_fl_minus_Q_leak_2
-            leak_p2 = 0.05
-            leak_p5 = 0.05
-            total_Q_fl_minus_Q_leak = leak_p2+ leak_p5
-
-
-            # extraction_ratio = (total_product_gas + self.V_top*self.adsorber1.dpe_p*(T_STP/self.T) + self.V_top*self.adsorber2.dpe_p*(T_STP/self.T)) / \    
-            #     ((total_input_gas  + total_Q_fl_minus_Q_leak - self.V_bot*self.adsorber1.dpe_p*(T_STP/self.T) - self.V_bot*self.adsorber2.dpe_p*(T_STP/self.T)))
-
-            extraction_ratio = (total_product_gas + leak_p5 + self.V_top*self.adsorber1.dpe_p*(T_STP/self.T) + self.V_top*self.adsorber2.dpe_p*(T_STP/self.T)) / \
-                ((total_input_gas  - leak_p2 - self.V_bot*self.adsorber1.dpe_p*(T_STP/self.T) - self.V_bot*self.adsorber2.dpe_p*(T_STP/self.T)))
-            
+            p_f_ratio_exp = 1 - (t_cycle*total_product_gas)/(2*t_ads*total_input_gas)
+            p_f_ratio_with_b = 1 - t_cycle*(total_product_gas)/((2*t_ads)*(total_input_gas - product_on_bot))
+            p_f_ratio_with_t_b = 1 - t_cycle*(total_product_gas + product_on_top)/((2*t_ads)*(total_input_gas - product_on_bot))
             extraction_ratio_naive = total_product_gas / total_input_gas
-            extraction_ratio_with_collectors = (total_product_gas + self.V_top*(self.adsorber1.dpe_p)*(T_STP/self.T) + self.V_top*(self.adsorber2.dpe_p)*(T_STP/self.T)) / \
-                (total_input_gas - self.V_bot*(self.adsorber1.dpe_p)*(T_STP/self.T) - self.V_bot*(self.adsorber2.dpe_p)*(T_STP/self.T))
-            
-            gass_loss_on_collectors = (self.V_top*(self.adsorber1.dpe_p)*(T_STP/self.T) + self.V_top*(self.adsorber2.dpe_p)*(T_STP/self.T)) + \
-             + (self.V_bot*(self.adsorber1.dpe_p)*(T_STP/self.T) + self.V_bot*(self.adsorber2.dpe_p)*(T_STP/self.T))
-            
+            extraction_ratio_with_collectors = (total_product_gas + product_on_top) / (total_input_gas - product_on_bot)
+            extraction_ratio_max = (2*t_ads*total_input_gas ) / (t_cycle*total_input_gas )
             total_input_product = total_input_gas
 
 
         # Фиксируем утечку на последнем цикле перед подачей смеси
         if self.cycle_number_at_wich_track_total_Q_fl_minus_Q_leak_on_product_gas == (self.current_cycle_number):
-            self.total_Q_fl_minus_Q_leak_on_product_gas = total_Q_fl_minus_Q_leak
+            self.total_Q_fl_minus_Q_leak_on_product_gas = 0
 
-        self.cycle_time_line[-2]["Q_leak_minus_Q_fl"] = + total_Q_fl_minus_Q_leak       # утечка
-        self.cycle_time_line[-2]["extraction_ratio"] = extraction_ratio                 # Извлечение полное
+
+        self.cycle_time_line[-2]["p_f_ratio_exp"] = p_f_ratio_exp
+        self.cycle_time_line[-2]["p_f_ratio_b"] = p_f_ratio_with_b
+        self.cycle_time_line[-2]["p_f_ratio_t_b"] = p_f_ratio_with_t_b
         self.cycle_time_line[-2]["extraction_ratio_naive"] = extraction_ratio_naive     # Степень извлечения
         self.cycle_time_line[-2]["extraction_ratio_with_collectors"] = extraction_ratio_with_collectors # Степень извлечения с учетом коллекторов
+        self.cycle_time_line[-2]["extraction_ratio_max"] = extraction_ratio_max # Степень извлечения с учетом коллекторов
         self.cycle_time_line[-2]["total_input_gas"] = total_input_gas                   # Вход [л]
         self.cycle_time_line[-2]["total_input_product"] = total_input_product           # Вход продукта [л]
         self.cycle_time_line[-2]["total_product_gas"] = total_product_gas               # Выход [л]
-        self.cycle_time_line[-2]["total_dump_throw_dpe"] = total_dump_throw_dpe         # Вышло на dpe [л]
-        self.cycle_time_line[-2]["total_dump_throw_purge"] = total_dump_on_purge        # Вышло на purge [л]
-        self.cycle_time_line[-2]["gass_loss_on_collectors"] = gass_loss_on_collectors   # Вышло продукта на top/bottom [л]
-        self.cycle_time_line[-2]["duration_sec"] = int(self.cycle_time_line[-1]["time"] - self.cycle_time_line[-2]["time"])
+        self.cycle_time_line[-2]["gass_loss_on_collectors"] = product_on_top + product_on_bot   # Вышло продукта на top/bottom [л]
+        self.cycle_time_line[-2]["duration_sec"] = int(t_cycle)
         self.cycle_time_line[-2]["cycle_on_mix"] = cycle_on_mix                         # Флаг идет ли смесь
 
         
