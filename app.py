@@ -346,7 +346,7 @@ class StageLegendWidget(QtWidgets.QWidget):
 
 # таблица со степенью извлечения на графике стадий
 class StageCycleMiniTable(QtWidgets.QWidget):
-    def __init__(self, max_rows=100):
+    def __init__(self, max_rows=1000):
         super().__init__()
 
         self.max_rows = max_rows
@@ -803,6 +803,8 @@ class CycleMonitorTab(QtWidgets.QWidget):
         main_layout = QtWidgets.QVBoxLayout(self)
         main_layout.setContentsMargins(8, 8, 8, 8)
 
+
+
         title = QtWidgets.QLabel("Мониторинг циклов")
         title.setStyleSheet("font-size: 10pt; font-weight: bold;")
         main_layout.addWidget(title)
@@ -900,6 +902,142 @@ class CycleMonitorTab(QtWidgets.QWidget):
                 row_data.append(item.text() if item else "")
             rows.append("\t".join(row_data))
         QtWidgets.QApplication.clipboard().setText("\n".join(rows))
+
+
+class CycleGraphs(QtWidgets.QWidget):
+    def __init__(self, metrics: list, colors: list, x_y_label_offset=30):
+        super().__init__()
+
+        self.metrics = metrics
+        self.colors = colors
+
+        self.data = {m: [] for m in metrics}
+        self.mean_curves = {}
+        self.cycles = []
+        self.x_y_label_offset = x_y_label_offset
+
+        main_layout = QtWidgets.QHBoxLayout(self)
+
+        self.plot = pg.PlotWidget()
+        self.plot.setBackground('w')
+        self.plot.showGrid(x=True, y=True)
+        self.plot.setLabel('bottom', 'Цикл')
+        self.plot.setLabel('left', 'Value')
+        self.plot.getAxis("left").enableAutoSIPrefix(False)
+        self.plot.setYRange(0, 0.25)
+        
+        self.legend = pg.LegendItem((100, 60), offset=(50, 10), labelTextSize='12pt', labelTextColor="#131414")
+        self.legend.setParentItem(self.plot.getPlotItem())
+
+
+        self.curves = {}
+        for i, m in enumerate(metrics):
+            curve = pg.PlotDataItem(pen=pg.mkPen(colors[i], width=2), symbol="o", symbolSize=10, symbolBrush=colors[i], name=m)
+            curve.setDownsampling(auto=True, method='peak')
+            self.plot.addItem(curve)
+            self.curves[m] = curve
+            self.legend.addItem(curve, m)
+
+        main_layout.addWidget(self.plot, 1)
+
+        right = QtWidgets.QVBoxLayout()
+        right.setAlignment(QtCore.Qt.AlignTop)
+
+        # --- mean lines
+        for i, m in enumerate(metrics):
+            mean_curve = pg.PlotDataItem(
+                pen=pg.mkPen(colors[i], width=2, style=QtCore.Qt.DashLine))
+            self.plot.addItem(mean_curve)
+            self.mean_curves[m] = mean_curve
+            self.legend.addItem(mean_curve, f"среднее {m}")
+
+        # --- выбор N
+        n_layout = QtWidgets.QHBoxLayout()
+        n_label1 = QtWidgets.QLabel("Считать за последние:")
+        n_label2 = QtWidgets.QLabel("циклов")
+        self.n_spin = QtWidgets.QSpinBox()
+        self.n_spin.setRange(1, 1000)
+        self.n_spin.setValue(20)
+        self.n_spin.valueChanged.connect(self.update_stats)
+
+        n_layout.addWidget(n_label1)
+        n_layout.addWidget(self.n_spin)
+        n_layout.addWidget(n_label2)
+        right.addLayout(n_layout)
+
+        # --- таблица статистики
+        self.table = QtWidgets.QTableWidget(len(metrics), 4)
+        self.table.setHorizontalHeaderLabels([" ", "Mean", "Std", "Last"])
+        self.table.verticalHeader().setVisible(False)
+
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+
+        for row, m in enumerate(metrics):
+            self.table.setItem(row, 0, QtWidgets.QTableWidgetItem(m))
+        right.addWidget(self.table)
+        main_layout.addLayout(right)
+
+
+        self.proxy = pg.SignalProxy(self.plot.scene().sigMouseMoved, rateLimit=60, slot=self.mouse_moved) # колбэк для подписи x,y курсора
+        self.coord_label = pg.LabelItem(justify='right', color = "#1d1f1eef")
+        self.coord_label.setZValue(100)
+        self.plot.scene().addItem(self.coord_label)
+        self.coord_label.setPos(self.x_y_label_offset, self.coord_label.height() - 20) 
+
+
+    def add_cycle(self, cycle_number: int, values: dict):
+        self.cycles.append(cycle_number)
+        for m in self.metrics:
+            self.data[m].append(values.get(m, 0))
+        self.update_plot()
+        self.update_stats()
+
+    def update_plot(self):
+        x = np.array(self.cycles)
+        for m in self.metrics:
+            y = np.array(self.data[m])
+            self.curves[m].setData(x, y)
+
+            # --- линия среднего по последним N
+            N = self.n_spin.value()
+            last = y[-N:] if len(y) >= N else y
+            if len(last) == 0:
+                continue
+            mean_val = np.mean(last)
+            # горизонтальная линия
+            self.mean_curves[m].setData(
+                [x[0], x[-1]],
+                [mean_val, mean_val]
+            )
+
+    def update_stats(self):
+        N = self.n_spin.value()
+        for row, m in enumerate(self.metrics):
+            arr = np.array(self.data[m])
+            if len(arr) == 0:
+                continue
+            last = arr[-N:]
+            mean = np.mean(last)
+            std = np.std(last)
+            self.table.setItem(row, 1, QtWidgets.QTableWidgetItem(f"{mean:.3f}"))
+            self.table.setItem(row, 2, QtWidgets.QTableWidgetItem(f"{std:.3f}"))
+            self.table.setItem(row, 3, QtWidgets.QTableWidgetItem(f"{arr[-1]:.3f}"))
+        
+        self.update_plot()
+
+
+    def mouse_moved(self, evt):
+        pos = evt[0]
+        vb = self.plot.plotItem.vb
+        if self.plot.sceneBoundingRect().contains(pos):
+            mouse_point = vb.mapSceneToView(pos)
+            self.coord_label.setText(f"x={mouse_point.x():.2f}\ny={mouse_point.y():.4f}")
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.coord_label.setPos(self.x_y_label_offset, self.plot.height() - self.coord_label.height() - 20)
+
 
 
 class FlowMassTab(QtWidgets.QWidget):
@@ -1002,6 +1140,9 @@ class MainWindow(QtWidgets.QWidget):
         # TAB 6
         self.cycle_monitor_tab = CycleMonitorTab()
 
+        # TAB 7
+        self.cycle_monitor_graphs = CycleGraphs(metrics=["p/f t_b"], colors=["black"])
+
         # ADD TABS
         self.tabs.addTab(tab_adsorbers, "Адсорберы")
         self.tabs.addTab(tab_lines, "Линии")
@@ -1009,6 +1150,7 @@ class MainWindow(QtWidgets.QWidget):
         self.tabs.addTab(tab_cycle, "Стадии")
         self.tabs.addTab(self.cycle_monitor_tab, "Мониторинг циклов")
         self.tabs.addTab(self.calibration_tab, "Калибровка")
+        self.tabs.addTab(self.cycle_monitor_graphs, "График p/f")
         self.tabs.setFont(QFont("Google Sans", 12))
 
 
@@ -1072,12 +1214,16 @@ class MainWindow(QtWidgets.QWidget):
                                          p_f_b=data["p_f_ratio_b"],
                                          p_f_t_b=data["p_f_ratio_t_b"]
                                          )
+        self.cycle_monitor_graphs.add_cycle(cycle_number=data["number"],
+                                            values={
+                                                "p/f t_b": data["p_f_ratio_t_b"]
+                                            })
         
     def add_cycle_monitor_data_to_stages_tab(self, data: dict):
         self.cycle_widget.stage_cycle_table.add_cycle(cycle_number=data["number"], recovery_degree=data["extraction_ratio_with_collectors"], cycle_on_mix=data["cycle_on_mix"])
         self.cycle_widget.add_cycle_number_text(t_start=data["time"], number=data["number"])
         self.cycle_widget.cycle_duration_list.append(data["duration_sec"])
-        
+
 
     # STREAM ERROR HANDLER
     def on_stream_error(self, message):

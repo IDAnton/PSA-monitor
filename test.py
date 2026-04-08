@@ -31,11 +31,11 @@ t_start = 0
 res1 = []
 for i in range(len(time1)):
     if (time1[i] - t_start) < c_len[current_c]:
-        res1.append(current_c+(time1[i] - t_start)/c_len[current_c])
+        res1.append(1 + current_c+(time1[i] - t_start)/c_len[current_c])
     elif current_c < len(c_len)-1:
         t_start = time1[i]
         current_c += 1
-        res1.append(current_c+(time1[i] - t_start)/c_len[current_c])
+        res1.append(1 + current_c+(time1[i] - t_start)/c_len[current_c])
 
 
 
@@ -44,6 +44,6 @@ with open('циклограмма.csv', "w", newline="", encoding="utf-8") as f:
     for i in range(len(res1)):
         row = []
         if i < len(res1):
-            row.append(f"{time1[i]+t0}")# .replace('.', ','))
-            row.append(f"{res1[i]}" )#.replace('.', ','))
+            row.append(f"{time1[i] + t0}".replace('.', ','))
+            row.append(f"{res1[i]}" .replace('.', ','))
         writer.writerow(row)
